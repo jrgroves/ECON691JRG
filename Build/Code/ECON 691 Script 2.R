@@ -56,9 +56,13 @@ for(i in states){
     mutate("Clinton" = as.numeric(gsub(",","",Clinton)),
            "Trump" = as.numeric(gsub(",","",Trump)),
            "pctClinton" = (Clinton)/(Clinton+Trump),
-           "pctTrump" = Trump/(Clinton+Trump))
+           "pctTrump" = Trump/(Clinton+Trump),
+           state = i)
   assign(i,results2)
 }
+
+votes<-rbind(kentucky,indiana,illinois,missouri,wisconsin,iowa) #used in lecture 3
+save(votes,file="./Build/Output/votes.RData")                   #used in lecture 3
 
 library(tidycensus)
 
