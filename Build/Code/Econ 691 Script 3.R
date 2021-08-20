@@ -3,10 +3,7 @@ library(tidyverse)
 library(sf)
 
 #Functions
-perc<-function(x,y){ 
-  temp<-x/y 
-  return(temp)
-}
+
 
 #Generate data from Census API
 #Pre-defining variables to be used in loop
@@ -77,7 +74,7 @@ census$NAME<-as.data.frame(str_split_fixed(census$NAME, ",", 2))[,1]
 #Load Vote Data 
   load("./Build/Output/votes.RData")
   
-  votes$County[which(votes$County=="DeWitt")]<-"De  Witt"
+  votes$County[which(votes$County=="DeWitt")]<-"De Witt"
   votes$County[which(votes$County=="JoDaviess")]<-"Jo Daviess" 
   votes$County[which(votes$County=="LaClede")]<-"Laclede" 
   votes$County[which(votes$County=="LaRue")]<-"Larue" 
@@ -88,4 +85,91 @@ census$NAME<-as.data.frame(str_split_fixed(census$NAME, ",", 2))[,1]
   core<-merge(census,votes,by.x=c("NAME","state"), by.y=c("County","state"),all=TRUE)
   core$area<-st_area(core) #Command for maps in ggplot later
 
+  core<-core %>%
+    subset(!is.na(perWhite))
+
+#Map Full Core Data#####
   
+  ggplot(core)+ 
+    geom_sf(aes(fill = perWhite))+
+    scale_fill_gradient(low="white",high="blue",limits=c(0,1),aes(name="Percent  White"))+
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          axis.text.x=element_blank(),
+          axis.text.y = element_blank(),
+          axis.line = element_blank(),
+          axis.ticks = element_blank())+
+    geom_sf(
+      data = States,
+      fill=NA, colour="black",
+      size=1,
+      inherit.aes=FALSE
+    )
+  
+  ggplot(core)+ 
+    geom_sf(aes(fill = pctClinton))+
+    scale_fill_gradient(low="red",high="blue",limits=c(0,1),
+                         aes(name="Percent Clinton"))+
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          axis.text.x=element_blank(),
+          axis.text.y = element_blank(),
+          axis.line = element_blank(),
+          axis.ticks = element_blank()) +
+    geom_sf(
+      data = States,
+      fill=NA, colour="black",
+      size=1,
+      inherit.aes=FALSE
+    )
+  
+######Regressions######
+  
+mod1<-lm(pctClinton~perWhite, data=core)
+mod2<-lm(pctClinton~perWhite-1, data=core)
+
+summary(mod1)
+summary(mod2)
+
+mod3<-lm(pctClinton ~ perWhite + perMale + perCit + perSameCounty + 
+           perSameSt + perOthState + perAbroad, data = core)
+summary(mod3)
+
+mod4<-lm(pctClinton ~ perWhite + perMale + perCit + perSameCounty + 
+           perSameSt + perOthState + perAbroad+factor(state), data = core)
+summary(mod4) 
+
+#Plotting other elements of the mod List
+p1<-ggplot(core, aes(x=perWhite))+
+  geom_point(aes(y=pctClinton))+
+  xlim(0,1)+
+  xlab("Percent Population White")+
+  ylim(0,1)+
+  ylab("Percent Clinton")+
+  geom_line(aes(y=mod1$fitted.values), color="red")+
+  theme_bw()
+p1
+
+p2<-ggplot(mod4,aes(x=seq(1:600)))+
+  geom_line(aes(y=mod4$residuals), color="blue")+
+  geom_line(aes(y=0), color="black")+
+  ylim(-0.5,0.5)+
+  xlab("Observations")+ 
+  ylab("Residuals")+ 
+  theme_bw()
+p2
+
+###Reporting Results####
+
+library(stargazer)
+
+core.2<-core %>%
+  select(-c(GEOID, area))
+  core.2$geometry<-NULL
+
+stargazer(core.2, type="html", out="./Build/Output/SumStat.html")
+
+stargazer(mod1, mod2, mod3, mod4, type="html", out="./Build/Output/regress.html")
+
